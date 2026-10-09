@@ -547,11 +547,11 @@ if prompt:
                     )
 
                     if previous_id:
-                        options["previous_interaction_id"] = previous_id
-
+                         options["previous_interaction_id"] = previous_id
+                    st.info("DIAGNO STIC : appel envoyé au moteur...")
                     # Un seul appel au moteur, sans boucle de streaming
                     interaction = client.interactions.create(**options)
-
+                    st.info("DIAGNOSTIC : réponse reçue du moteur !")
                     answer = extract_answer(interaction)
 
                     interaction_id = getattr(
