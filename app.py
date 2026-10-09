@@ -248,14 +248,12 @@ def get_api_key():
     return key.strip() if key else ""
 
 
+
 @st.cache_resource
 def get_client(api_key):
-    # Le délai est exprimé en millisecondes.
-    http_options = types.HttpOptions(timeout=45000)
-
     return genai.Client(
         api_key=api_key,
-        http_options=http_options,
+        http_options=types.HttpOptions(timeout=20000)
     )
 
 
@@ -533,55 +531,32 @@ if prompt:
                         'GEMINI_API_KEY = "ta_cle_api".'
                     )
 
-                with st.spinner("Connexion au moteur Xeno..."):
-                    client = get_client(api_key)
+                st.info("DIAGNOSTIC 1 : préparation de la demande...")
 
-                    options = {
-                        "model": MODEL,
-                        "input": prompt,
-                        "system_instruction": SYSTEM_PROMPT,
-                    }
+                client = get_client(api_key)
 
-                    previous_id = (
-                        st.session_state.previous_interaction_id
-                    )
+                options = {
+                    "model": MODEL,
+                    "input": prompt,
+                    "system_instruction": SYSTEM_PROMPT,
+                }
 
-                    if previous_id:
-                         options["previous_interaction_id"] = previous_id
-                    st.info("DIAGNO STIC : appel envoyé au moteur...")
-                    # Un seul appel au moteur, sans boucle de streaming
-                    interaction = client.interactions.create(**options)
-                    st.info("DIAGNOSTIC : réponse reçue du moteur !")
-                    answer = extract_answer(interaction)
+                previous_id = st.session_state.get("previous_interaction_id")
+                if previous_id:
+                    options["previous_interaction_id"] = previous_id
 
-                    interaction_id = getattr(
-                        interaction, "id", None
-                    )
+                st.info("DIAGNOSTIC 2 : demande envoyée, attente de la réponse...")
 
-                    if interaction_id:
-                        st.session_state.previous_interaction_id = (
-                            interaction_id
-                        )
+                interaction = client.interactions.create(**options)
 
-                if not answer:
-                    answer = (
-                        "Le moteur n'a renvoyé aucun texte. "
-                        "Vérifie le modèle et réessaie."
-                    )
-
+                st.success("DIAGNOSTIC 3 : réponse reçue !")
+                answer = extract_answer(interaction)
                 response_area.markdown(answer)
 
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": answer,
-            })
+        except Exception as e:
+            st.error(f"ERREUR DU MOTEUR : {type(e).__name__}: {e}")
+            st.stop()
 
-        except Exception as error:
-            # Afficher l'erreur pour permettre le diagnostic
-            response_area.error(
-                f"Xeno n'a pas pu répondre : "
-                f"{type(error).__name__}: {error}"
-            )
 
 
 # ==================================================
