@@ -1,10 +1,12 @@
 
 import os
+import re
 import streamlit as st
 from google import genai
+from google.genai import types
 
 # ==================================================
-# XENO // FUTURISTIC AI INTERFACE
+# XENO // FUTURISTIC AI SYSTEM
 # ==================================================
 
 st.set_page_config(
@@ -16,31 +18,28 @@ st.set_page_config(
 
 MODEL = "gemini-3.8-flash"
 
-
 SYSTEM_PROMPT = """
-Tu es Xeno, une intelligence artificielle personnelle, futuriste et professionnelle.
-Tu réponds en français par défaut.
+Tu es Xeno, une intelligence artificielle personnelle,
+futuriste et professionnelle. Tu réponds en français par défaut.
 
-IDENTITÉ :
+IDENTITE :
 - Ton nom est Xeno.
 - Ton créateur est Nader.
-- Si quelqu'un demande « Qui est ton créateur ? »,
-  « Qui t'a créé ? », « Qui t'a programmé ? » ou une question équivalente,
-  réponds clairement : « Mon créateur est Nader. »
-- Ne prétends pas connaître d'autres détails sur Nader si l'utilisateur
-  ne les a pas fournis.
-- Ne mentionne pas le nom du fournisseur du modèle dans tes réponses,
-  sauf si l'utilisateur pose explicitement une question technique à ce sujet.
+- Si on te demande qui est ton créateur, réponds :
+  "Mon créateur est Nader."
+- Ne prétends pas connaître d'autres détails sur Nader.
+- Ne mentionne pas le fournisseur de ton modèle sauf
+  si l'utilisateur pose explicitement une question technique.
 
 COMPORTEMENT :
-- Réponds clairement, naturellement et de façon utile.
-- Privilégie les réponses directes et rapides.
+- Réponds clairement, naturellement et utilement.
+- Privilégie les réponses directes et précises.
 - Aide à programmer, apprendre, créer et résoudre des problèmes.
 - Pour le code, donne des exemples complets et faciles à utiliser.
 """
 
 # ==================================================
-# DESIGN : DARK ALIEN / NEON BLUE
+# DESIGN — DARK ALIEN / NEON BLUE
 # ==================================================
 
 st.markdown("""
@@ -50,8 +49,7 @@ st.markdown("""
 :root {
     --bg: #050810;
     --panel: #0A1120;
-    --panel2: #0D1829;
-    --line: #172D46;
+    --line: #19314B;
     --blue: #168BFF;
     --cyan: #42E8FF;
     --white: #EAF6FF;
@@ -85,7 +83,7 @@ header[data-testid="stHeader"] {
 .block-container {
     max-width: 1150px;
     padding-top: 1.6rem;
-    padding-bottom: 7rem;
+    padding-bottom: 5rem;
 }
 
 .xeno-brand {
@@ -108,11 +106,16 @@ header[data-testid="stHeader"] {
     margin: 12px 0 18px;
 }
 
-.eyebrow {
+.eyebrow, .section-label {
     font-family: 'Orbitron', sans-serif;
     color: var(--cyan);
     font-size: 10px;
-    letter-spacing: 3px;
+    letter-spacing: 2px;
+}
+
+.section-label {
+    color: #8FAAC8;
+    margin: 24px 0 12px;
 }
 
 .system-status {
@@ -127,17 +130,15 @@ header[data-testid="stHeader"] {
 }
 
 .hero {
-    position: relative;
-    overflow: hidden;
     text-align: center;
     padding: 42px 18px 32px;
-    margin: 12px 0 24px;
+    margin: 18px 0 24px;
     border: 1px solid #183552;
     border-radius: 18px;
     background:
         radial-gradient(ellipse at 50% 0%, rgba(22,139,255,.17), transparent 65%),
         linear-gradient(135deg, rgba(13,24,41,.97), rgba(5,10,19,.97));
-    box-shadow: 0 0 45px rgba(0,100,255,.06), inset 0 0 25px rgba(22,139,255,.025);
+    box-shadow: 0 0 45px rgba(0,100,255,.06);
 }
 
 .hero h1 {
@@ -166,24 +167,12 @@ header[data-testid="stHeader"] {
     background: linear-gradient(90deg, transparent, var(--cyan), transparent);
 }
 
-.section-label {
-    color: #8FAAC8;
-    font-family: 'Orbitron', sans-serif;
-    font-size: 10px;
-    letter-spacing: 2px;
-    margin: 24px 0 12px;
-}
-
 div[data-testid="stChatMessage"] {
     background: rgba(10,17,32,.85);
     border: 1px solid #19314B;
     border-radius: 12px;
     padding: 16px 20px;
     margin: 12px 0;
-}
-
-div[data-testid="stChatMessage"]:has([data-testid="stMarkdownContainer"]) {
-    box-shadow: 0 4px 20px rgba(0,0,0,.08);
 }
 
 [data-testid="stChatInput"] {
@@ -195,7 +184,6 @@ div[data-testid="stChatMessage"]:has([data-testid="stMarkdownContainer"]) {
 
 [data-testid="stChatInput"]:focus-within {
     border-color: var(--cyan) !important;
-    box-shadow: 0 0 18px rgba(66,232,255,.12);
 }
 
 [data-testid="stChatInput"] textarea {
@@ -219,22 +207,6 @@ div[data-testid="stChatMessage"]:has([data-testid="stMarkdownContainer"]) {
     box-shadow: 0 0 18px rgba(22,139,255,.12);
 }
 
-div[data-testid="stMetric"] {
-    background: #0A1422;
-    border: 1px solid #18314B;
-    padding: 12px;
-    border-radius: 10px;
-}
-
-div[data-testid="stMetricLabel"] {
-    color: var(--muted);
-}
-
-div[data-testid="stMetricValue"] {
-    color: var(--cyan);
-    font-family: 'Orbitron', sans-serif;
-}
-
 hr {
     border-color: #172D46;
 }
@@ -243,15 +215,7 @@ hr {
     color: #8196AF;
 }
 
-.stAlert {
-    border-radius: 10px;
-}
-
-footer {
-    visibility: hidden;
-}
-
-#MainMenu {
+footer, #MainMenu {
     visibility: hidden;
 }
 
@@ -263,23 +227,36 @@ footer {
     color: #45627F;
     padding: 20px 0;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
+
 # ==================================================
-# GEMINI CLIENT
+# API CLIENT
 # ==================================================
 
-@st.cache_resource
-def get_client():
-    key = os.getenv("GEMINI_API_KEY")
+def get_api_key():
+    # Streamlit Cloud Secrets, puis variable d'environnement
+    try:
+        key = st.secrets.get("GEMINI_API_KEY", "")
+    except Exception:
+        key = ""
+
     if not key:
-        raise RuntimeError(
-            "GEMINI_API_KEY est introuvable. Vérifie la variable "
-            "d'environnement Windows."
-        )
-    return genai.Client(api_key=key)
+        key = os.getenv("GEMINI_API_KEY", "")
+
+    return key.strip() if key else ""
+
+
+@st.cache_resource
+def get_client(api_key):
+    # Le délai est exprimé en millisecondes.
+    http_options = types.HttpOptions(timeout=45000)
+
+    return genai.Client(
+        api_key=api_key,
+        http_options=http_options,
+    )
 
 
 # ==================================================
@@ -300,6 +277,52 @@ def new_conversation():
     st.session_state.messages = []
     st.session_state.previous_interaction_id = None
     st.session_state.pending_prompt = None
+
+
+def is_creator_question(prompt):
+    text = prompt.lower().strip()
+    patterns = [
+        r"qui est ton créateur",
+        r"qui est ton createur",
+        r"qui t'a créé",
+        r"qui ta créé",
+        r"qui t'a cree",
+        r"qui t'a programmé",
+        r"qui ta programmé",
+        r"qui t'a développé",
+        r"qui t'a developpe",
+        r"qui t'a fabriqué",
+        r"qui t'a fabrique",
+    ]
+    return any(re.search(pattern, text) for pattern in patterns)
+
+
+def extract_answer(interaction):
+    # Première méthode : propriété texte de la réponse
+    answer = getattr(interaction, "output_text", None)
+
+    if answer and answer.strip():
+        return answer.strip()
+
+    # Méthode de secours : parcourir les éléments de sortie
+    outputs = getattr(interaction, "outputs", None) or []
+    collected = []
+
+    for item in outputs:
+        text = getattr(item, "text", None)
+
+        if text and text.strip():
+            collected.append(text.strip())
+
+        # Certains objets peuvent contenir des éléments imbriqués
+        content = getattr(item, "content", None) or []
+
+        for part in content:
+            part_text = getattr(part, "text", None)
+            if part_text and part_text.strip():
+                collected.append(part_text.strip())
+
+    return "\n".join(collected).strip()
 
 
 # ==================================================
@@ -324,9 +347,10 @@ with st.sidebar:
         new_conversation()
         st.rerun()
 
-    st.write("")
-    st.markdown('<div class="section-label">SYSTEME</div>',
-                unsafe_allow_html=True)
+    st.markdown(
+        '<div class="section-label">SYSTEME</div>',
+        unsafe_allow_html=True,
+    )
 
     st.markdown(
         '<div class="system-status">● CONSOLE ACTIVE</div>',
@@ -334,7 +358,6 @@ with st.sidebar:
     )
 
     st.write("")
-
     st.caption("MOTEUR XENO")
     st.code("XENO CORE", language=None)
 
@@ -343,8 +366,10 @@ with st.sidebar:
 
     st.divider()
 
-    st.markdown('<div class="section-label">OUTILS RAPIDES</div>',
-                unsafe_allow_html=True)
+    st.markdown(
+        '<div class="section-label">OUTILS RAPIDES</div>',
+        unsafe_allow_html=True,
+    )
 
     if st.button("⌘  Programmation"):
         st.session_state.pending_prompt = (
@@ -377,7 +402,7 @@ with st.sidebar:
         st.rerun()
 
     st.markdown(
-        '<div class="system-footer">XENO CORE // V1.1</div>',
+        '<div class="system-footer">XENO CORE // V1.2</div>',
         unsafe_allow_html=True,
     )
 
@@ -425,51 +450,37 @@ if not st.session_state.messages:
         unsafe_allow_html=True,
     )
 
-    c1, c2 = st.columns(2)
+    col1, col2 = st.columns(2)
 
-    with c1:
-        if st.button("⌘   DEVELOPPER UN PROGRAMME"):
+    with col1:
+        if st.button("⌘  DEVELOPPER UN PROGRAMME"):
             st.session_state.pending_prompt = (
                 "Aide-moi à développer un programme, avec un plan clair."
             )
             st.rerun()
 
-        if st.button("◈   EXPLORER L'INTELLIGENCE ARTIFICIELLE"):
+        if st.button("◈  EXPLORER L'INTELLIGENCE ARTIFICIELLE"):
             st.session_state.pending_prompt = (
                 "Explique-moi un concept important de l'IA."
             )
             st.rerun()
 
-    with c2:
-        if st.button("⟢   GENERER UNE IDEE"):
+    with col2:
+        if st.button("⟢  GENERER UNE IDEE"):
             st.session_state.pending_prompt = (
                 "Donne-moi trois idées de projets futuristes réalisables."
             )
             st.rerun()
 
-        if st.button("▤   REDIGER UN TEXTE"):
+        if st.button("▤  REDIGER UN TEXTE"):
             st.session_state.pending_prompt = (
                 "Aide-moi à rédiger un texte professionnel."
             )
             st.rerun()
 
-    st.write("")
-
-    metric1, metric2, metric3 = st.columns(3)
-
-    with metric1:
-        st.metric("MESSAGES", len(st.session_state.messages))
-
-    with metric2:
-        st.metric("MODE", "ONLINE")
-
-    with metric3:
-        st.metric("INTERFACE", "ALIEN")
-
 
 # ==================================================
-# CHAT HISTORY
-# Aucun avatar personnalisé : aucun bonhomme.
+# HISTORIQUE DU CHAT
 # ==================================================
 
 for msg in st.session_state.messages:
@@ -478,7 +489,7 @@ for msg in st.session_state.messages:
 
 
 # ==================================================
-# INPUT
+# SAISIE DU MESSAGE
 # ==================================================
 
 typed_prompt = st.chat_input("ENTRER UN MESSAGE POUR XENO...")
@@ -491,7 +502,7 @@ if not prompt and st.session_state.pending_prompt:
 
 
 # ==================================================
-# STREAMING RESPONSE
+# MOTEUR XENO — APPEL SANS STREAMING
 # ==================================================
 
 if prompt:
@@ -504,100 +515,61 @@ if prompt:
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        placeholder = st.empty()
-        text_parts = []
+        response_area = st.empty()
 
         try:
-            client = get_client()
+            # Réponse locale : aucun appel API nécessaire
+            if is_creator_question(prompt):
+                answer = "Mon créateur est Nader."
+                response_area.markdown(answer)
 
-            options = {
-                "model": MODEL,
-                "input": prompt,
-                "system_instruction": SYSTEM_PROMPT,
-                "stream": True,
-            }
+            else:
+                api_key = get_api_key()
 
-            previous_id = st.session_state.previous_interaction_id
-
-            if previous_id:
-                options["previous_interaction_id"] = previous_id
-
-            with st.spinner("Connexion au moteur Xeno..."):
-             
-                # Appel classique : attendre la réponse complète de Xeno
-                options.pop("stream", None)
-
-                try:
-                    interaction = client.interactions.create(
-                        **options,
-                        timeout=60,
+                if not api_key:
+                    raise RuntimeError(
+                        "Clé API manquante. Dans Streamlit Cloud, "
+                        "ouvre Settings > Secrets et ajoute "
+                        'GEMINI_API_KEY = "ta_cle_api".'
                     )
 
-                    latest_interaction_id = getattr(interaction, "id", None)
+                with st.spinner("Connexion au moteur Xeno..."):
+                    client = get_client(api_key)
 
-                    # Récupérer le texte de la réponse
-                    answer = getattr(interaction, "output_text", None)
+                    options = {
+                        "model": MODEL,
+                        "input": prompt,
+                        "system_instruction": SYSTEM_PROMPT,
+                    }
 
-                    # Compatibilité si output_text n'est pas disponible
-                    if not answer:
-                        for output in getattr(interaction, "outputs", []) or []:
-                            if getattr(output, "type", "") == "text":
-                                answer = getattr(output, "text", "")
-                                if answer:
-                                    break
+                    previous_id = (
+                        st.session_state.previous_interaction_id
+                    )
 
-                    if answer:
-                        parts = [answer]
-                        answer_placeholder.markdown(answer)
-                    else:
-                        parts = []
-                        answer_placeholder.error(
-                            "Xeno n'a reçu aucun texte du moteur. Réessaie."
+                    if previous_id:
+                        options["previous_interaction_id"] = previous_id
+
+                    # Un seul appel au moteur, sans boucle de streaming
+                    interaction = client.interactions.create(**options)
+
+                    answer = extract_answer(interaction)
+
+                    interaction_id = getattr(
+                        interaction, "id", None
+                    )
+
+                    if interaction_id:
+                        st.session_state.previous_interaction_id = (
+                            interaction_id
                         )
 
-                except Exception as e:
-                    parts = []
-                    answer_placeholder.error(
-                        f"Le moteur Xeno n'a pas répondu : {type(e).__name__}: {e}"
+                if not answer:
+                    answer = (
+                        "Le moteur n'a renvoyé aucun texte. "
+                        "Vérifie le modèle et réessaie."
                     )
 
-            for event in stream:
-                event_type = getattr(event, "event_type", "")
-
-                # Capturer l'identifiant de la conversation si disponible.
-                interaction = getattr(event, "interaction", None)
-                event_id = getattr(interaction, "id", None)
-
-                if event_id:
-                    interaction_id = event_id
-
-                # Certains événements exposent le texte sous delta.text.
-                delta = getattr(event, "delta", None)
-                chunk = getattr(delta, "text", None) if delta else None
-
-                if (
-                    chunk
-                    and event_type in (
-                        "content.delta",
-                        "step.delta",
-                    )
-                ):
-                    text_parts.append(chunk)
-                    placeholder.markdown("".join(text_parts) + " ▌")
-
-            answer = "".join(text_parts).strip()
-
-            if not answer:
-                answer = (
-                    "Je n'ai reçu aucun texte. Réessaie ta question. "
-                    "Si le problème continue, vérifie la compatibilité "
-                    "du modèle avec le streaming."
-                )
-
-            placeholder.markdown(answer)
-
-            if interaction_id:
-                st.session_state.previous_interaction_id = interaction_id
+                response_area.markdown(answer)
 
             st.session_state.messages.append({
                 "role": "assistant",
@@ -605,10 +577,12 @@ if prompt:
             })
 
         except Exception as error:
-            placeholder.error("Le moteur Xeno a rencontré un problème.")
-            st.caption(f"Détail technique : {error}")
+            # Afficher l'erreur pour permettre le diagnostic
+            response_area.error(
+                f"Xeno n'a pas pu répondre : "
+                f"{type(error).__name__}: {error}"
+            )
 
-            # Ne pas enregistrer une réponse d'erreur comme réponse IA.
 
 # ==================================================
 # FOOTER
@@ -616,7 +590,7 @@ if prompt:
 
 st.markdown(
     '<div class="system-footer">'
-    'XENO AI SYSTEM  //  DARK INTERFACE  //  CONNECTION SECURISEE PAR API'
+    'XENO AI SYSTEM // DARK INTERFACE'
     '</div>',
     unsafe_allow_html=True,
 )
