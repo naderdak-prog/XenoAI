@@ -523,9 +523,43 @@ if prompt:
                 options["previous_interaction_id"] = previous_id
 
             with st.spinner("Connexion au moteur Xeno..."):
-                stream = client.interactions.create(**options)
+             
+                # Appel classique : attendre la réponse complète de Xeno
+                options.pop("stream", None)
 
-            interaction_id = None
+                try:
+                    interaction = client.interactions.create(
+                        **options,
+                        timeout=60,
+                    )
+
+                    latest_interaction_id = getattr(interaction, "id", None)
+
+                    # Récupérer le texte de la réponse
+                    answer = getattr(interaction, "output_text", None)
+
+                    # Compatibilité si output_text n'est pas disponible
+                    if not answer:
+                        for output in getattr(interaction, "outputs", []) or []:
+                            if getattr(output, "type", "") == "text":
+                                answer = getattr(output, "text", "")
+                                if answer:
+                                    break
+
+                    if answer:
+                        parts = [answer]
+                        answer_placeholder.markdown(answer)
+                    else:
+                        parts = []
+                        answer_placeholder.error(
+                            "Xeno n'a reçu aucun texte du moteur. Réessaie."
+                        )
+
+                except Exception as e:
+                    parts = []
+                    answer_placeholder.error(
+                        f"Le moteur Xeno n'a pas répondu : {type(e).__name__}: {e}"
+                    )
 
             for event in stream:
                 event_type = getattr(event, "event_type", "")
